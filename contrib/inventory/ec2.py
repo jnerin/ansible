@@ -159,6 +159,7 @@ from boto import elasticache
 from boto import route53
 from boto import sts
 import six
+from datetime import datetime
 
 from ansible.module_utils import ec2 as ec2_utils
 
@@ -721,13 +722,6 @@ class Ec2Inventory(object):
         account_id = boto.connect_iam().get_user().arn.split(':')[4]
         c_dict = {}
         for c in clusters:
-            # remove these datetime objects as there is no serialisation to json
-            # currently in place and we don't need the data yet
-            if 'EarliestRestorableTime' in c:
-                del c['EarliestRestorableTime']
-            if 'LatestRestorableTime' in c:
-                del c['LatestRestorableTime']
-
             if not self.ec2_instance_filters:
                 matches_filter = True
             else:
@@ -1686,12 +1680,21 @@ class Ec2Inventory(object):
             regex += r"\-"
         return re.sub(regex + "]", "_", word)
 
+    @classmethod
+    def json_serial(cls, obj):
+        """JSON serializer for objects not serializable by default json code"""
+
+        if isinstance(obj, datetime):
+            serial = obj.isoformat()
+            return serial
+        raise TypeError ("Type not serializable")    
+    
     def json_format_dict(self, data, pretty=False):
         ''' Converts a dict to a JSON object and dumps it as a formatted
         string '''
 
         if pretty:
-            return json.dumps(data, sort_keys=True, indent=2)
+            return json.dumps(data, sort_keys=True, indent=2, default=Ec2Inventory.json_serial)
         else:
             return json.dumps(data)
 
